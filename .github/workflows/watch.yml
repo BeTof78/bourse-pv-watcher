@@ -1,0 +1,41 @@
+name: Surveillance bourse aux dossards
+
+on:
+  schedule:
+    # Toutes les 5 minutes (minimum autorisé par GitHub Actions).
+    # Note : GitHub ne garantit pas l'exécution pile à l'heure sur le plan gratuit,
+    # des retards de quelques minutes sont possibles en période de forte charge.
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {}  # permet de lancer le script manuellement depuis l'onglet Actions
+
+permissions:
+  contents: write  # nécessaire pour committer state.json à chaque run
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout du repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Installer les dépendances
+        run: pip install -r bourse_watcher/requirements.txt
+
+      - name: Exécuter le script de surveillance
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python bourse_watcher/watch_bourse.py
+
+      - name: Sauvegarder l'état (state.json) dans le repo
+        run: |
+          git config --global user.name "bourse-watcher-bot"
+          git config --global user.email "bot@users.noreply.github.com"
+          git add bourse_watcher/state.json
+          git diff --staged --quiet || git commit -m "update state.json [skip ci]"
+          git push
